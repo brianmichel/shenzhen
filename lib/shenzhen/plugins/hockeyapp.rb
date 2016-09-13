@@ -6,11 +6,11 @@ require 'faraday_middleware'
 module Shenzhen::Plugins
   module HockeyApp
     class Client
-      HOSTNAME = 'upload.hockeyapp.net'
+      DEFAULT_HOSTNAME = 'upload.hockeyapp.net'
 
-      def initialize(api_token)
+      def initialize(api_token, hostname = DEFAULT_HOSTNAME)
         @api_token = api_token
-        @connection = Faraday.new(:url => "https://#{HOSTNAME}") do |builder|
+        @connection = Faraday.new(:url => "https://#{hostname}") do |builder|
           builder.request :multipart
           builder.request :url_encoded
           builder.response :json, :content_type => /\bjson$/
@@ -53,6 +53,7 @@ command :'distribute:hockeyapp' do |c|
   c.option '-m', '--notes NOTES', "Release notes for the build (Default: Textile)"
   c.option '-r', '--release RELEASE', [:beta, :store, :alpha, :enterprise], "Release type: 0 - Beta, 1 - Store, 2 - Alpha , 3 - Enterprise"
   c.option '-o', '--owner_id OWNER_ID', "optional, set to the ID of your organization"
+  c.option '-s', '--hockey-server-host HOSTNAME', "Hostname to use for HockeyApp uploads. (i.e. 'rink.hockeyapp.net')"
   c.option '--markdown', 'Notes are written with Markdown'
   c.option '--tags TAGS', "Comma separated list of tags which will receive access to the build"
   c.option '--teams TEAMS', "Comma separated list of team ID numbers to which this build will be restricted"
@@ -94,7 +95,7 @@ command :'distribute:hockeyapp' do |c|
                                   "0"
                                 when :store
                                   "1"
-                                when :alpha 
+                                when :alpha
                                   "2"
                                 when :enterprise
                                   "3"
@@ -103,7 +104,13 @@ command :'distribute:hockeyapp' do |c|
     parameters[:build_server_url] = options.build_server_url if options.build_server_url
     parameters[:repository_url] = options.repository_url if options.repository_url
 
-    client = Shenzhen::Plugins::HockeyApp::Client.new(@api_token)
+    if options.hockey_server_host
+      parameters[:hockey_host_name] = options.hockey_server_host
+    else
+      parameters[:hockey_host_name] = Shenzhen::Plugins::HockeyApp::Client::DEFAULT_HOSTNAME
+    end
+
+    client = Shenzhen::Plugins::HockeyApp::Client.new(@api_token, options.hockey_server)
     response = client.upload_build(@file, parameters)
     case response.status
     when 200...300
